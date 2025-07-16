@@ -40,7 +40,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
-        // FIX: Explicitly get React and ReactDOM from the global window object
+        // Get React and ReactDOM from the global window object
         const React = window.React;
         const ReactDOM = window.ReactDOM;
 
@@ -260,30 +260,52 @@
             // --- Views based on currentUser role ---
 
             const LoginScreen = () => {
-                const [selectedVendorId, setSelectedVendorId] = React.useState(null);
+                const [selectedVendorId, setSelectedVendorId] = React.useState(null); // Used for login after ID is found
                 const [password, setPassword] = React.useState('');
                 const [loginError, setLoginError] = React.useState('');
-                const [showRegisterForm, setShowRegisterForm] = React.useState(false); // New state for registration form
+                const [showRegisterForm, setShowRegisterForm] = React.useState(false);
+                const [showVendorLoginFlow, setShowVendorLoginFlow] = React.useState(false); // New state to control vendor login flow visibility
+                const [vendorIdToSearch, setVendorIdToSearch] = React.useState(''); // New state for the ID input field
+                const [currentVendorAttempt, setCurrentVendorAttempt] = React.useState(null); // Stores the vendor object found by ID search
 
-                const handleVendorLogin = (vendorId) => {
-                    setSelectedVendorId(vendorId);
-                    setLoginError(''); // Clear previous errors
+                // Function to handle the initial click on "Soy Vendedor" button
+                const handleInitialVendorClick = () => {
+                    setShowVendorLoginFlow(true); // Show the vendor ID search input
+                    setShowRegisterForm(false); // Hide the registration form if it was open
+                    setLoginError(''); // Clear any previous login errors
+                    setVendorIdToSearch(''); // Clear the ID input field
+                    setCurrentVendorAttempt(null); // Clear any previously found vendor
+                    setSelectedVendorId(null); // Clear selected vendor ID
                     setPassword(''); // Clear password field
-                    setShowRegisterForm(false); // Hide registration form if showing
                 };
 
-                const handlePasswordSubmit = () => {
-                    const vendor = vendors.find(v => v.id === selectedVendorId); // Use 'vendors' state
-                    if (vendor && vendor.password === password) {
-                        setCurrentUser({ role: 'vendor', id: selectedVendorId });
-                        setLoginError('');
+                // Function to search for a vendor by ID
+                const handleSearchVendorId = () => {
+                    const found = vendors.find(v => v.id.toLowerCase() === vendorIdToSearch.toLowerCase());
+                    if (found) {
+                        setCurrentVendorAttempt(found); // Set the found vendor
+                        setSelectedVendorId(found.id); // Set selectedVendorId for password check
+                        setLoginError(''); // Clear any previous errors
                     } else {
-                        setLoginError('Contraseña incorrecta. Inténtalo de nuevo.');
+                        setCurrentVendorAttempt(null); // No vendor found
+                        setSelectedVendorId(null);
+                        setLoginError('ID de vendedor no encontrado.'); // Display error
+                    }
+                    setPassword(''); // Clear password field on new ID search
+                };
+
+                // Function to handle password submission for a found vendor
+                const handlePasswordSubmit = () => {
+                    if (currentVendorAttempt && currentVendorAttempt.password === password) {
+                        setCurrentUser({ role: 'vendor', id: currentVendorAttempt.id }); // Log in the vendor
+                        setLoginError(''); // Clear errors
+                    } else {
+                        setLoginError('Contraseña incorrecta. Inténtalo de nuevo.'); // Display password error
                     }
                 };
 
+                // Function to handle new vendor registration
                 const handleRegisterVendor = async (storeName, password) => {
-                    // Simulate API call for registration
                     setMessage('Registrando vendedor...');
                     await simulateApiCall();
 
@@ -303,8 +325,20 @@
 
                     setVendors(prevVendors => [...prevVendors, newVendor]);
                     setMessage(`¡Vendedor '${storeName}' registrado con éxito! Tu ID es: ${newVendorId}. Ahora puedes iniciar sesión.`);
-                    setShowRegisterForm(false); // Go back to login options
+                    setShowRegisterForm(false); // Hide registration form
+                    setShowVendorLoginFlow(false); // Go back to initial login options
                     setLoginError(''); // Clear any previous login errors
+                };
+
+                // Function to go back to the main login options
+                const handleBackToMainLogin = () => {
+                    setShowVendorLoginFlow(false); // Hide vendor login flow
+                    setShowRegisterForm(false); // Hide registration form
+                    setLoginError(''); // Clear errors
+                    setVendorIdToSearch(''); // Clear ID input
+                    setCurrentVendorAttempt(null); // Clear found vendor
+                    setSelectedVendorId(null); // Clear selected vendor ID
+                    setPassword(''); // Clear password
                 };
 
                 return (
@@ -312,65 +346,91 @@
                         <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full">
                             <h2 className="text-3xl font-extrabold text-gray-800 mb-6">Selecciona tu Rol</h2>
                             <div className="space-y-4">
-                                <button
-                                    onClick={() => setCurrentUser({ role: 'customer', id: 'c1' })}
-                                    className="w-full bg-green-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-green-600 transition duration-300 transform hover:scale-105 shadow-md"
-                                >
-                                    Soy Cliente
-                                </button>
-
-                                {showRegisterForm ? (
-                                    <VendorRegistrationForm
-                                        onRegister={handleRegisterVendor}
-                                        onCancel={() => setShowRegisterForm(false)}
-                                        registrationError={loginError} // Pass registration error
-                                    />
-                                ) : (
+                                {/* Initial login options */}
+                                {!showVendorLoginFlow && !showRegisterForm && (
                                     <>
-                                        {vendors.map(vendor => (
-                                            <React.Fragment key={vendor.id}>
-                                                <button
-                                                    onClick={() => handleVendorLogin(vendor.id)}
-                                                    className="w-full bg-indigo-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-indigo-600 transition duration-300 transform hover:scale-105 shadow-md"
-                                                >
-                                                    Soy Vendedor (ID: {vendor.id}) - {vendor.name}
-                                                </button>
-                                                {selectedVendorId === vendor.id && vendor.password && (
-                                                    <div className="mt-4 p-4 bg-indigo-100 rounded-lg shadow-inner">
-                                                        <p className="text-indigo-800 font-semibold mb-2">Ingresa la contraseña para {vendor.name}:</p>
-                                                        <input
-                                                            type="password"
-                                                            value={password}
-                                                            onChange={(e) => setPassword(e.target.value)}
-                                                            placeholder="Contraseña"
-                                                            className="w-full p-2 border border-indigo-300 rounded-md mb-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                                        />
-                                                        <button
-                                                            onClick={handlePasswordSubmit}
-                                                            className="w-full bg-indigo-700 text-white py-2 px-4 rounded-lg font-semibold hover:bg-indigo-800 transition duration-300"
-                                                        >
-                                                            Acceder
-                                                        </button>
-                                                        {loginError && <p className="text-red-600 mt-2 text-sm">{loginError}</p>}
-                                                    </div>
-                                                )}
-                                            </React.Fragment>
-                                        ))}
+                                        <button
+                                            onClick={() => setCurrentUser({ role: 'customer', id: 'c1' })}
+                                            className="w-full bg-green-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-green-600 transition duration-300 transform hover:scale-105 shadow-md"
+                                        >
+                                            Soy Cliente
+                                        </button>
+                                        <button
+                                            onClick={handleInitialVendorClick}
+                                            className="w-full bg-indigo-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-indigo-600 transition duration-300 transform hover:scale-105 shadow-md"
+                                        >
+                                            Soy Vendedor
+                                        </button>
                                         <button
                                             onClick={() => setShowRegisterForm(true)}
                                             className="w-full bg-purple-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-purple-600 transition duration-300 transform hover:scale-105 shadow-md"
                                         >
                                             Registrarme como Vendedor
                                         </button>
+                                        <button
+                                            onClick={() => setCurrentUser({ role: 'admin' })}
+                                            className="w-full bg-red-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-red-600 transition duration-300 transform hover:scale-105 shadow-md"
+                                >
+                                            Soy Administrador
+                                        </button>
                                     </>
                                 )}
 
-                                <button
-                                    onClick={() => setCurrentUser({ role: 'admin' })}
-                                    className="w-full bg-red-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-red-600 transition duration-300 transform hover:scale-105 shadow-md"
-                                >
-                                    Soy Administrador
-                                </button>
+                                {/* Vendor Login Flow (ID search and password) */}
+                                {showVendorLoginFlow && !showRegisterForm && (
+                                    <div className="mt-4 p-4 bg-indigo-100 rounded-lg shadow-inner">
+                                        <p className="text-indigo-800 font-semibold mb-2">Ingresa tu ID de Vendedor:</p>
+                                        <div className="flex space-x-2 mb-2">
+                                            <input
+                                                type="text"
+                                                value={vendorIdToSearch}
+                                                onChange={(e) => setVendorIdToSearch(e.target.value)}
+                                                placeholder="Ej: v1, v2, nuevo_vendedor"
+                                                className="w-full p-2 border border-indigo-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                                            />
+                                            <button
+                                                onClick={handleSearchVendorId}
+                                                className="bg-indigo-700 text-white py-2 px-4 rounded-lg font-semibold hover:bg-indigo-800 transition duration-300"
+                                            >
+                                                Buscar
+                                            </button>
+                                        </div>
+                                        {currentVendorAttempt && (
+                                            <div className="mt-4">
+                                                <p className="text-indigo-800 font-semibold mb-2">Ingresa la contraseña para {currentVendorAttempt.name}:</p>
+                                                <input
+                                                    type="password"
+                                                    value={password}
+                                                    onChange={(e) => setPassword(e.target.value)}
+                                                    placeholder="Contraseña"
+                                                    className="w-full p-2 border border-indigo-300 rounded-md mb-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                                />
+                                                <button
+                                                    onClick={handlePasswordSubmit}
+                                                    className="w-full bg-indigo-700 text-white py-2 px-4 rounded-lg font-semibold hover:bg-indigo-800 transition duration-300"
+                                                >
+                                                    Acceder
+                                                </button>
+                                            </div>
+                                        )}
+                                        {loginError && <p className="text-red-600 mt-2 text-sm">{loginError}</p>}
+                                        <button
+                                            onClick={handleBackToMainLogin}
+                                            className="mt-4 bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-semibold hover:bg-gray-400 transition duration-300"
+                                        >
+                                            Volver
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Vendor Registration Form */}
+                                {showRegisterForm && (
+                                    <VendorRegistrationForm
+                                        onRegister={handleRegisterVendor}
+                                        onCancel={handleBackToMainLogin} // Use handleBackToMainLogin to go back to initial options
+                                        registrationError={loginError}
+                                    />
+                                )}
                             </div>
                             <p className="text-gray-600 mt-6 text-sm">
                                 Esta es una simulación. En un bot real, la autenticación sería diferente.
@@ -510,7 +570,7 @@
                                             <h3 className="text-xl font-semibold text-gray-900 mb-2">{product.name}</h3>
                                             <p className="text-gray-600 text-sm mb-3 flex-grow">{product.description}</p>
                                             <p className="text-gray-700 font-bold text-lg mb-3">${product.price.toFixed(2)}</p>
-                                            <p className="text-sm text-gray-500 mb-2">Vendedor: {vendors.find(v => v.id === product.vendorId)?.name || 'Desconocido'}</p> {/* Use 'vendors' state */}
+                                            <p className="text-sm text-gray-500 mb-2">Vendedor: {vendors.find(v => v.id === product.vendorId)?.name || 'Desconocido'}</p>
                                             <p className={`text-sm font-semibold ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 Stock: {product.stock > 0 ? product.stock : 'Agotado'}
                                             </p>
@@ -544,7 +604,7 @@
                                                         <img src={item.imageUrl} alt={item.name} className="w-16 h-16 rounded-md object-cover" onError={(e) => e.target.src = 'https://placehold.co/100x100/CCCCCC/000000?text=Error'} />
                                                         <div>
                                                             <p className="font-semibold text-gray-900">{item.name}</p>
-                                                            <p className="text-gray-600 text-sm">Vendedor: {vendors.find(v => v.id === item.vendorId)?.name}</p> {/* Use 'vendors' state */}
+                                                            <p className="text-gray-600 text-sm">Vendedor: {vendors.find(v => v.id === item.vendorId)?.name}</p>
                                                             <p className="text-gray-700">${item.price.toFixed(2)} c/u</p>
                                                         </div>
                                                     </div>
@@ -626,7 +686,7 @@
 
                         {currentView === 'vendor-products' && (
                             <div className="bg-white p-6 rounded-xl shadow-lg mt-8">
-                                <h3 className="text-2xl font-bold text-gray-800 mb-5">Productos de {vendors.find(v => v.id === currentUser.id)?.name || 'Este Vendedor'}</h3> {/* Use 'vendors' state */}
+                                <h3 className="text-2xl font-bold text-gray-800 mb-5">Productos de {vendors.find(v => v.id === currentUser.id)?.name || 'Este Vendedor'}</h3>
                                 {vendorProducts.length === 0 ? (
                                     <p className="text-gray-600 text-center py-4">Aún no tienes productos. ¡Añade uno!</p>
                                 ) : (
@@ -664,7 +724,7 @@
 
                         {currentView === 'vendor-orders' && (
                             <div className="bg-white p-6 rounded-xl shadow-lg mt-8">
-                                <h3 className="text-2xl font-bold text-gray-800 mb-5">Pedidos para {vendors.find(v => v.id === currentUser.id)?.name || 'Este Vendedor'}</h3> {/* Use 'vendors' state */}
+                                <h3 className="text-2xl font-bold text-gray-800 mb-5">Pedidos para {vendors.find(v => v.id === currentUser.id)?.name || 'Este Vendedor'}</h3>
                                 {vendorOrders.length === 0 ? (
                                     <p className="text-gray-600 text-center py-4">No hay pedidos para este vendedor.</p>
                                 ) : (
@@ -839,7 +899,7 @@
                                                 <img src={product.imageUrl} alt={product.name} className="w-12 h-12 object-cover rounded-md" onError={(e) => e.target.src = 'https://placehold.co/100x100/CCCCCC/000000?text=Error'} />
                                                 <div>
                                                     <p className="font-semibold text-gray-900">{product.name}</p>
-                                                    <p className="text-sm text-gray-600">Vendedor: {vendors.find(v => v.id === product.vendorId)?.name || 'Desconocido'}</p> {/* Use 'vendors' state */}
+                                                    <p className="text-sm text-gray-600">Vendedor: {vendors.find(v => v.id === product.vendorId)?.name || 'Desconocido'}</p>
                                                     <p className={`text-sm font-semibold ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                         Stock: {product.stock > 0 ? product.stock : 'Agotado'}
                                                     </p>
@@ -871,7 +931,7 @@
 
                             {/* Sección de Vendedores */}
                             <div className="bg-white p-6 rounded-xl shadow-lg">
-                                <h3 className="text-2xl font-bold text-gray-800 mb-4">Todos los Vendedores ({vendors.length})</h3> {/* Use 'vendors' state */}
+                                <h3 className="text-2xl font-bold text-gray-800 mb-4">Todos los Vendedores ({vendors.length})</h3>
                                 <div className="max-h-96 overflow-y-auto space-y-3">
                                     {vendors.map(vendor => (
                                         <div key={vendor.id} className="bg-gray-50 p-3 rounded-md shadow-sm">
