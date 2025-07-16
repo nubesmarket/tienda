@@ -63,6 +63,9 @@
         // Initial mock orders (empty for a fresh start)
         const initialMockOrders = [];
 
+        // Admin password constant
+        const ADMIN_PASSWORD = 'MiMamaMeMima361612';
+
         function App() {
             // State to manage the current user's role: 'customer', 'vendor', 'admin', or null (for login screen)
             const [currentUser, setCurrentUser] = React.useState(null); // { role: 'customer', id: 'c1' } or { role: 'vendor', id: 'v1' } or { role: 'admin' }
@@ -233,7 +236,7 @@
             // --- General UI Components ---
             const Header = ({ user, onLogout }) => (
                 <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-b-lg shadow-lg flex justify-between items-center">
-                    <h1 className="text-2xl font-bold">Simulación de Bot de Telegram</h1>
+                    <h1 className="text-2xl font-bold">LIBERTATEM SHOP</h1> {/* Changed shop name here */}
                     {user && (
                         <div className="flex items-center space-x-4">
                             <span className="text-lg">
@@ -265,6 +268,7 @@
                 const [loginError, setLoginError] = React.useState('');
                 const [showRegisterForm, setShowRegisterForm] = React.useState(false);
                 const [showVendorLoginFlow, setShowVendorLoginFlow] = React.useState(false); // New state to control vendor login flow visibility
+                const [showAdminLoginFlow, setShowAdminLoginFlow] = React.useState(false); // New state for admin login flow
                 const [vendorIdToSearch, setVendorIdToSearch] = React.useState(''); // New state for the ID input field
                 const [currentVendorAttempt, setCurrentVendorAttempt] = React.useState(null); // Stores the vendor object found by ID search
 
@@ -272,10 +276,20 @@
                 const handleInitialVendorClick = () => {
                     setShowVendorLoginFlow(true); // Show the vendor ID search input
                     setShowRegisterForm(false); // Hide the registration form if it was open
+                    setShowAdminLoginFlow(false); // Hide admin login flow
                     setLoginError(''); // Clear any previous login errors
                     setVendorIdToSearch(''); // Clear the ID input field
                     setCurrentVendorAttempt(null); // Clear any previously found vendor
                     setSelectedVendorId(null); // Clear selected vendor ID
+                    setPassword(''); // Clear password field
+                };
+
+                // Function to handle the initial click on "Soy Administrador" button
+                const handleInitialAdminClick = () => {
+                    setShowAdminLoginFlow(true); // Show admin password input
+                    setShowVendorLoginFlow(false); // Hide vendor login flow
+                    setShowRegisterForm(false); // Hide registration form
+                    setLoginError(''); // Clear any previous login errors
                     setPassword(''); // Clear password field
                 };
 
@@ -304,6 +318,16 @@
                     }
                 };
 
+                // Function to handle admin password submission
+                const handleAdminPasswordSubmit = () => {
+                    if (password === ADMIN_PASSWORD) {
+                        setCurrentUser({ role: 'admin' });
+                        setLoginError('');
+                    } else {
+                        setLoginError('Contraseña de administrador incorrecta. Inténtalo de nuevo.');
+                    }
+                };
+
                 // Function to handle new vendor registration
                 const handleRegisterVendor = async (storeName, password) => {
                     setMessage('Registrando vendedor...');
@@ -327,6 +351,7 @@
                     setMessage(`¡Vendedor '${storeName}' registrado con éxito! Tu ID es: ${newVendorId}. Ahora puedes iniciar sesión.`);
                     setShowRegisterForm(false); // Hide registration form
                     setShowVendorLoginFlow(false); // Go back to initial login options
+                    setShowAdminLoginFlow(false); // Hide admin login flow
                     setLoginError(''); // Clear any previous login errors
                 };
 
@@ -334,6 +359,7 @@
                 const handleBackToMainLogin = () => {
                     setShowVendorLoginFlow(false); // Hide vendor login flow
                     setShowRegisterForm(false); // Hide registration form
+                    setShowAdminLoginFlow(false); // Hide admin login flow
                     setLoginError(''); // Clear errors
                     setVendorIdToSearch(''); // Clear ID input
                     setCurrentVendorAttempt(null); // Clear found vendor
@@ -347,7 +373,7 @@
                             <h2 className="text-3xl font-extrabold text-gray-800 mb-6">Selecciona tu Rol</h2>
                             <div className="space-y-4">
                                 {/* Initial login options */}
-                                {!showVendorLoginFlow && !showRegisterForm && (
+                                {!showVendorLoginFlow && !showRegisterForm && !showAdminLoginFlow && (
                                     <>
                                         <button
                                             onClick={() => setCurrentUser({ role: 'customer', id: 'c1' })}
@@ -368,16 +394,16 @@
                                             Registrarme como Vendedor
                                         </button>
                                         <button
-                                            onClick={() => setCurrentUser({ role: 'admin' })}
+                                            onClick={handleInitialAdminClick}
                                             className="w-full bg-red-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-red-600 transition duration-300 transform hover:scale-105 shadow-md"
-                                >
+                                        >
                                             Soy Administrador
                                         </button>
                                     </>
                                 )}
 
                                 {/* Vendor Login Flow (ID search and password) */}
-                                {showVendorLoginFlow && !showRegisterForm && (
+                                {showVendorLoginFlow && !showRegisterForm && !showAdminLoginFlow && (
                                     <div className="mt-4 p-4 bg-indigo-100 rounded-lg shadow-inner">
                                         <p className="text-indigo-800 font-semibold mb-2">Ingresa tu ID de Vendedor:</p>
                                         <div className="flex space-x-2 mb-2">
@@ -413,6 +439,33 @@
                                                 </button>
                                             </div>
                                         )}
+                                        {loginError && <p className="text-red-600 mt-2 text-sm">{loginError}</p>}
+                                        <button
+                                            onClick={handleBackToMainLogin}
+                                            className="mt-4 bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-semibold hover:bg-gray-400 transition duration-300"
+                                        >
+                                            Volver
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Admin Login Flow */}
+                                {showAdminLoginFlow && !showVendorLoginFlow && !showRegisterForm && (
+                                    <div className="mt-4 p-4 bg-red-100 rounded-lg shadow-inner">
+                                        <p className="text-red-800 font-semibold mb-2">Ingresa la contraseña de Administrador:</p>
+                                        <input
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="Contraseña de Administrador"
+                                            className="w-full p-2 border border-red-300 rounded-md mb-2 focus:ring-red-500 focus:border-red-500"
+                                        />
+                                        <button
+                                            onClick={handleAdminPasswordSubmit}
+                                            className="w-full bg-red-700 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-800 transition duration-300"
+                                        >
+                                            Acceder como Administrador
+                                        </button>
                                         {loginError && <p className="text-red-600 mt-2 text-sm">{loginError}</p>}
                                         <button
                                             onClick={handleBackToMainLogin}
@@ -530,9 +583,15 @@
 
 
             const CustomerDashboard = () => {
+                const [searchTerm, setSearchTerm] = React.useState(''); // New state for search term
                 const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-                // Filter out products with 0 stock for customer view
-                const availableProducts = products.filter(p => p.stock > 0);
+
+                // Filter out products with 0 stock and apply search filter
+                const filteredProducts = products.filter(p => p.stock > 0).filter(product => {
+                    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+                    return product.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+                           product.description.toLowerCase().includes(lowerCaseSearchTerm);
+                });
 
                 return (
                     <div className="p-6 bg-gray-50 min-h-screen">
@@ -562,32 +621,46 @@
                         <MessageDisplay msg={message} />
 
                         {currentView === 'browse' && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-                                {availableProducts.map(product => (
-                                    <div key={product.id} className="bg-white rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition duration-300 flex flex-col">
-                                        <img src={product.imageUrl} alt={product.name} className="w-full h-48 object-cover" onError={(e) => e.target.src = 'https://placehold.co/100x100/CCCCCC/000000?text=Error'} />
-                                        <div className="p-5 flex flex-col flex-grow">
-                                            <h3 className="text-xl font-semibold text-gray-900 mb-2">{product.name}</h3>
-                                            <p className="text-gray-600 text-sm mb-3 flex-grow">{product.description}</p>
-                                            <p className="text-gray-700 font-bold text-lg mb-3">${product.price.toFixed(2)}</p>
-                                            <p className="text-sm text-gray-500 mb-2">Vendedor: {vendors.find(v => v.id === product.vendorId)?.name || 'Desconocido'}</p>
-                                            <p className={`text-sm font-semibold ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                Stock: {product.stock > 0 ? product.stock : 'Agotado'}
-                                            </p>
-                                            <button
-                                                onClick={() => handleAddToCart(product)}
-                                                className="mt-auto bg-blue-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-600 transition duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                                disabled={product.stock <= 0}
-                                            >
-                                                Añadir al Carrito
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                                {availableProducts.length === 0 && (
-                                    <p className="text-center text-gray-600 col-span-full">No hay productos disponibles en stock.</p>
-                                )}
-                            </div>
+                            <>
+                                {/* Search Input */}
+                                <div className="mb-6">
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar productos por nombre o descripción..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+                                    {filteredProducts.length > 0 ? (
+                                        filteredProducts.map(product => (
+                                            <div key={product.id} className="bg-white rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition duration-300 flex flex-col">
+                                                <img src={product.imageUrl} alt={product.name} className="w-full h-48 object-cover" onError={(e) => e.target.src = 'https://placehold.co/100x100/CCCCCC/000000?text=Error'} />
+                                                <div className="p-5 flex flex-col flex-grow">
+                                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{product.name}</h3>
+                                                    <p className="text-gray-600 text-sm mb-3 flex-grow">{product.description}</p>
+                                                    <p className="text-gray-700 font-bold text-lg mb-3">${product.price.toFixed(2)}</p>
+                                                    <p className="text-sm text-gray-500 mb-2">Vendedor: {vendors.find(v => v.id === product.vendorId)?.name || 'Desconocido'}</p>
+                                                    <p className={`text-sm font-semibold ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        Stock: {product.stock > 0 ? product.stock : 'Agotado'}
+                                                    </p>
+                                                    <button
+                                                        onClick={() => handleAddToCart(product)}
+                                                        className="mt-auto bg-blue-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-600 transition duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        disabled={product.stock <= 0}
+                                                    >
+                                                        Añadir al Carrito
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-center text-gray-600 col-span-full">No se encontraron productos que coincidan con tu búsqueda o no hay productos disponibles en stock.</p>
+                                    )}
+                                </div>
+                            </>
                         )}
 
                         {currentView === 'cart' && (
