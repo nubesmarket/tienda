@@ -40,19 +40,23 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
+        // FIX: Explicitly get React and ReactDOM from the global window object
+        const React = window.React;
+        const ReactDOM = window.ReactDOM;
+
         // Mock data for demonstration purposes
         const mockProducts = [
-            { id: 'p1', name: 'Camiseta de Algodón', description: 'Camiseta suave y cómoda.', price: 15.99, vendorId: 'v1', imageUrl: 'https://placehold.co/100x100/AEC6CF/000000?text=Camiseta' },
-            { id: 'p2', name: 'Pantalones Vaqueros', description: 'Vaqueros clásicos, corte recto.', price: 45.00, vendorId: 'v1', imageUrl: 'https://placehold.co/100x100/FFDDC1/000000?text=Vaqueros' },
-            { id: 'p3', name: 'Libro de Cocina', description: 'Recetas saludables y fáciles.', price: 22.50, vendorId: 'v2', imageUrl: 'https://placehold.co/100x100/B3E0FF/000000?text=Libro' },
-            { id: 'p4', name: 'Auriculares Inalámbricos', description: 'Sonido de alta calidad, batería duradera.', price: 79.99, vendorId: 'v3', imageUrl: 'https://placehold.co/100x100/D4A6C8/000000?text=Auriculares' },
-            { id: 'p5', name: 'Cafetera Espresso', description: 'Prepara tu café favorito en casa.', price: 120.00, vendorId: 'v2', imageUrl: 'https://placehold.co/100x100/C1FFC1/000000?text=Cafetera' },
+            { id: 'p1', name: 'Camiseta de Algodón', description: 'Camiseta suave y cómoda.', price: 15.99, vendorId: 'v1', imageUrl: 'https://placehold.co/100x100/AEC6CF/000000?text=Camiseta', stock: 10 },
+            { id: 'p2', name: 'Pantalones Vaqueros', description: 'Vaqueros clásicos, corte recto.', price: 45.00, vendorId: 'v1', imageUrl: 'https://placehold.co/100x100/FFDDC1/000000?text=Vaqueros', stock: 5 },
+            { id: 'p3', name: 'Libro de Cocina', description: 'Recetas saludables y fáciles.', price: 22.50, vendorId: 'v2', imageUrl: 'https://placehold.co/100x100/B3E0FF/000000?text=Libro', stock: 20 },
+            { id: 'p4', name: 'Auriculares Inalámbricos', description: 'Sonido de alta calidad, batería duradera.', price: 79.99, vendorId: 'v3', imageUrl: 'https://placehold.co/100x100/D4A6C8/000000?text=Auriculares', stock: 3 },
+            { id: 'p5', name: 'Cafetera Espresso', description: 'Prepara tu café favorito en casa.', price: 120.00, vendorId: 'v2', imageUrl: 'https://placehold.co/100x100/C1FFC1/000000?text=Cafetera', stock: 0 }, // Example of out of stock
         ];
 
         const mockVendors = [
-            { id: 'v1', name: 'Tienda de Ropa Cool' },
-            { id: 'v2', name: 'Gadgets y Libros' },
-            { id: 'v3', name: 'Electrónica Pro' },
+            { id: 'v1', name: 'Tienda de Ropa Cool', password: 'password123' }, // Added password
+            { id: 'v2', name: 'Gadgets y Libros', password: 'secret456' },   // Added password
+            { id: 'v3', name: 'Electrónica Pro' }, // No password for this one, can be added if needed
         ];
 
         // Initial mock orders (empty for a fresh start)
@@ -81,11 +85,22 @@
 
             // --- Customer Functions ---
             const handleAddToCart = async (product) => {
+                if (product.stock <= 0) {
+                    setMessage(`Lo sentimos, '${product.name}' está agotado.`);
+                    return;
+                }
+
                 setMessage('Añadiendo producto al carrito...');
                 await simulateApiCall(); // Simulate network request
+
                 setCart(prevCart => {
                     const existingItem = prevCart.find(item => item.id === product.id);
                     if (existingItem) {
+                        // Check if adding more would exceed stock
+                        if (existingItem.quantity + 1 > product.stock) {
+                            setMessage(`No hay suficiente stock para añadir otra unidad de '${product.name}'.`);
+                            return prevCart; // Don't update cart if stock is insufficient
+                        }
                         return prevCart.map(item =>
                             item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
                         );
@@ -102,8 +117,18 @@
 
             const handleUpdateCartQuantity = (productId, quantity) => {
                 setCart(prevCart => {
+                    const productInCart = prevCart.find(item => item.id === productId);
+                    const originalProduct = products.find(p => p.id === productId);
+
+                    if (!productInCart || !originalProduct) return prevCart;
+
                     if (quantity <= 0) {
                         return prevCart.filter(item => item.id !== productId);
+                    }
+                    // Check if new quantity exceeds stock
+                    if (quantity > originalProduct.stock) {
+                        setMessage(`No hay suficiente stock para ${originalProduct.name}. Stock disponible: ${originalProduct.stock}`);
+                        return prevCart; // Don't update if stock is insufficient
                     }
                     return prevCart.map(item =>
                         item.id === productId ? { ...item, quantity: quantity } : item
@@ -130,8 +155,27 @@
                     timestamp: new Date().toISOString(),
                 };
 
-                // In a real app, this would involve breaking down the order by vendor
-                // and notifying each vendor. Here, we'll add it as a single order for simplicity.
+                // Update product stock and remove if out of stock
+                setProducts(prevProducts => {
+                    let updatedProducts = [...prevProducts];
+                    cart.forEach(cartItem => {
+                        const productIndex = updatedProducts.findIndex(p => p.id === cartItem.id);
+                        if (productIndex !== -1) {
+                            const currentProduct = updatedProducts[productIndex];
+                            const newStock = currentProduct.stock - cartItem.quantity;
+                            if (newStock <= 0) {
+                                // Remove product if stock is 0 or less
+                                updatedProducts = updatedProducts.filter(p => p.id !== cartItem.id);
+                                setMessage(`Producto '${currentProduct.name}' agotado y eliminado de la tienda.`);
+                            } else {
+                                // Update stock
+                                updatedProducts[productIndex] = { ...currentProduct, stock: newStock };
+                            }
+                        }
+                    });
+                    return updatedProducts;
+                });
+
                 setOrders(prevOrders => [...prevOrders, newOrder]);
                 setCart([]); // Clear cart after placing order
                 setMessage('¡Pedido realizado con éxito!');
@@ -143,7 +187,11 @@
                 setMessage('Guardando producto...');
                 await simulateApiCall(); // Simulate network request
 
-                if (productData.id) {
+                if (productData.stock <= 0) {
+                    // If stock is 0 or less, remove the product
+                    setProducts(prevProducts => prevProducts.filter(p => p.id !== productData.id));
+                    setMessage(`Producto '${productData.name}' eliminado por falta de stock.`);
+                } else if (productData.id) {
                     // Update existing product
                     setProducts(prevProducts =>
                         prevProducts.map(p => (p.id === productData.id ? productData : p))
@@ -207,45 +255,86 @@
 
             // --- Views based on currentUser role ---
 
-            const LoginScreen = () => (
-                <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-                    <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full">
-                        <h2 className="text-3xl font-extrabold text-gray-800 mb-6">Selecciona tu Rol</h2>
-                        <div className="space-y-4">
-                            <button
-                                onClick={() => setCurrentUser({ role: 'customer', id: 'c1' })}
-                                className="w-full bg-green-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-green-600 transition duration-300 transform hover:scale-105 shadow-md"
-                            >
-                                Soy Cliente
-                            </button>
-                            <button
-                                onClick={() => setCurrentUser({ role: 'vendor', id: 'v1' })}
-                                className="w-full bg-indigo-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-indigo-600 transition duration-300 transform hover:scale-105 shadow-md"
-                            >
-                                Soy Vendedor (ID: v1)
-                            </button>
-                            <button
-                                onClick={() => setCurrentUser({ role: 'vendor', id: 'v2' })}
-                                className="w-full bg-indigo-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-indigo-600 transition duration-300 transform hover:scale-105 shadow-md"
-                            >
-                                Soy Vendedor (ID: v2)
-                            </button>
-                            <button
-                                onClick={() => setCurrentUser({ role: 'admin' })}
-                                className="w-full bg-red-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-red-600 transition duration-300 transform hover:scale-105 shadow-md"
-                            >
-                                Soy Administrador
-                            </button>
+            const LoginScreen = () => {
+                const [selectedVendorId, setSelectedVendorId] = React.useState(null);
+                const [password, setPassword] = React.useState('');
+                const [loginError, setLoginError] = React.useState('');
+
+                const handleVendorLogin = (vendorId) => {
+                    setSelectedVendorId(vendorId);
+                    setLoginError(''); // Clear previous errors
+                    setPassword(''); // Clear password field
+                };
+
+                const handlePasswordSubmit = () => {
+                    const vendor = mockVendors.find(v => v.id === selectedVendorId);
+                    if (vendor && vendor.password === password) {
+                        setCurrentUser({ role: 'vendor', id: selectedVendorId });
+                        setLoginError('');
+                    } else {
+                        setLoginError('Contraseña incorrecta. Inténtalo de nuevo.');
+                    }
+                };
+
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+                        <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full">
+                            <h2 className="text-3xl font-extrabold text-gray-800 mb-6">Selecciona tu Rol</h2>
+                            <div className="space-y-4">
+                                <button
+                                    onClick={() => setCurrentUser({ role: 'customer', id: 'c1' })}
+                                    className="w-full bg-green-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-green-600 transition duration-300 transform hover:scale-105 shadow-md"
+                                >
+                                    Soy Cliente
+                                </button>
+                                {mockVendors.map(vendor => (
+                                    <React.Fragment key={vendor.id}>
+                                        <button
+                                            onClick={() => handleVendorLogin(vendor.id)}
+                                            className="w-full bg-indigo-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-indigo-600 transition duration-300 transform hover:scale-105 shadow-md"
+                                        >
+                                            Soy Vendedor (ID: {vendor.id})
+                                        </button>
+                                        {selectedVendorId === vendor.id && vendor.password && (
+                                            <div className="mt-4 p-4 bg-indigo-100 rounded-lg shadow-inner">
+                                                <p className="text-indigo-800 font-semibold mb-2">Ingresa la contraseña para {vendor.name}:</p>
+                                                <input
+                                                    type="password"
+                                                    value={password}
+                                                    onChange={(e) => setPassword(e.target.value)}
+                                                    placeholder="Contraseña"
+                                                    className="w-full p-2 border border-indigo-300 rounded-md mb-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                                />
+                                                <button
+                                                    onClick={handlePasswordSubmit}
+                                                    className="w-full bg-indigo-700 text-white py-2 px-4 rounded-lg font-semibold hover:bg-indigo-800 transition duration-300"
+                                                >
+                                                    Acceder
+                                                </button>
+                                                {loginError && <p className="text-red-600 mt-2 text-sm">{loginError}</p>}
+                                            </div>
+                                        )}
+                                    </React.Fragment>
+                                ))}
+                                <button
+                                    onClick={() => setCurrentUser({ role: 'admin' })}
+                                    className="w-full bg-red-500 text-white py-3 px-6 rounded-lg text-xl font-semibold hover:bg-red-600 transition duration-300 transform hover:scale-105 shadow-md"
+                                >
+                                    Soy Administrador
+                                </button>
+                            </div>
+                            <p className="text-gray-600 mt-6 text-sm">
+                                Esta es una simulación. En un bot real, la autenticación sería diferente.
+                            </p>
                         </div>
-                        <p className="text-gray-600 mt-6 text-sm">
-                            Esta es una simulación. En un bot real, la autenticación sería diferente.
-                        </p>
                     </div>
-                </div>
-            );
+                );
+            };
 
             const CustomerDashboard = () => {
                 const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+                // Filter out products with 0 stock for customer view
+                const availableProducts = products.filter(p => p.stock > 0);
 
                 return (
                     <div className="p-6 bg-gray-50 min-h-screen">
@@ -276,25 +365,29 @@
 
                         {currentView === 'browse' && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-                                {products.map(product => (
+                                {availableProducts.map(product => (
                                     <div key={product.id} className="bg-white rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition duration-300 flex flex-col">
                                         <img src={product.imageUrl} alt={product.name} className="w-full h-48 object-cover" onError={(e) => e.target.src = 'https://placehold.co/100x100/CCCCCC/000000?text=Error'} />
                                         <div className="p-5 flex flex-col flex-grow">
                                             <h3 className="text-xl font-semibold text-gray-900 mb-2">{product.name}</h3>
                                             <p className="text-gray-600 text-sm mb-3 flex-grow">{product.description}</p>
                                             <p className="text-gray-700 font-bold text-lg mb-3">${product.price.toFixed(2)}</p>
-                                            <p className="text-sm text-gray-500 mb-4">Vendedor: {mockVendors.find(v => v.id === product.vendorId)?.name || 'Desconocido'}</p>
+                                            <p className="text-sm text-gray-500 mb-2">Vendedor: {mockVendors.find(v => v.id === product.vendorId)?.name || 'Desconocido'}</p>
+                                            <p className={`text-sm font-semibold ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                Stock: {product.stock > 0 ? product.stock : 'Agotado'}
+                                            </p>
                                             <button
                                                 onClick={() => handleAddToCart(product)}
-                                                className="mt-auto bg-blue-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-600 transition duration-300 shadow-md"
+                                                className="mt-auto bg-blue-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-600 transition duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                disabled={product.stock <= 0}
                                             >
                                                 Añadir al Carrito
                                             </button>
                                         </div>
                                     </div>
                                 ))}
-                                {products.length === 0 && (
-                                    <p className="text-center text-gray-600 col-span-full">No hay productos disponibles.</p>
+                                {availableProducts.length === 0 && (
+                                    <p className="text-center text-gray-600 col-span-full">No hay productos disponibles en stock.</p>
                                 )}
                             </div>
                         )}
@@ -406,6 +499,9 @@
                                                 <div className="flex-grow">
                                                     <p className="font-semibold text-lg text-gray-900">{product.name}</p>
                                                     <p className="text-gray-700">${product.price.toFixed(2)}</p>
+                                                    <p className={`text-sm font-semibold ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        Stock: {product.stock > 0 ? product.stock : 'Agotado'}
+                                                    </p>
                                                 </div>
                                                 <div className="flex space-x-2">
                                                     <button
@@ -487,11 +583,12 @@
                 const [description, setDescription] = React.useState(product ? product.description : '');
                 const [price, setPrice] = React.useState(product ? product.price : '');
                 const [imageUrl, setImageUrl] = React.useState(product ? product.imageUrl : `https://placehold.co/100x100/CCCCCC/000000?text=Producto`);
+                const [stock, setStock] = React.useState(product ? product.stock : 1); // Added stock state
 
                 const handleSubmit = (e) => {
                     e.preventDefault();
-                    if (!name || !description || !price) {
-                        setMessage('Por favor, completa todos los campos.');
+                    if (!name || !description || !price || stock === '' || stock < 0) { // Validate stock
+                        setMessage('Por favor, completa todos los campos y asegúrate de que el stock sea un número positivo.');
                         return;
                     }
                     onSave({
@@ -500,6 +597,7 @@
                         description,
                         price: parseFloat(price),
                         imageUrl,
+                        stock: parseInt(stock), // Pass stock
                     });
                 };
 
@@ -537,6 +635,18 @@
                                     onChange={(e) => setPrice(e.target.value)}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                                     step="0.01"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="stock" className="block text-gray-700 font-semibold mb-1">Stock</label>
+                                <input
+                                    type="number"
+                                    id="stock"
+                                    value={stock}
+                                    onChange={(e) => setStock(e.target.value)}
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                    min="0" // Stock cannot be negative
                                     required
                                 />
                             </div>
@@ -592,6 +702,9 @@
                                                 <div>
                                                     <p className="font-semibold text-gray-900">{product.name}</p>
                                                     <p className="text-sm text-gray-600">Vendedor: {mockVendors.find(v => v.id === product.vendorId)?.name || 'Desconocido'}</p>
+                                                    <p className={`text-sm font-semibold ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        Stock: {product.stock > 0 ? product.stock : 'Agotado'}
+                                                    </p>
                                                 </div>
                                             </div>
                                         ))
