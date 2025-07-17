@@ -236,7 +236,7 @@
             // --- General UI Components ---
             const Header = ({ user, onLogout }) => (
                 <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-b-lg shadow-lg flex justify-between items-center">
-                    <h1 className="text-2xl font-bold">LIBERTATEM SHOP</h1> {/* Changed shop name here */}
+                    <h1 className="text-2xl font-bold">LIBERTATEM SHOP</h1>
                     {user && (
                         <div className="flex items-center space-x-4">
                             <span className="text-lg">
@@ -856,6 +856,18 @@
                 const [imageUrl, setImageUrl] = React.useState(product ? product.imageUrl : `https://placehold.co/100x100/CCCCCC/000000?text=Producto`);
                 const [stock, setStock] = React.useState(product ? product.stock : 1); // Added stock state
 
+                // Handler for file input change
+                const handleImageUpload = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            setImageUrl(reader.result); // Set imageUrl to Base64 string
+                        };
+                        reader.readAsDataURL(file); // Read file as Base64
+                    }
+                };
+
                 const handleSubmit = (e) => {
                     e.preventDefault();
                     if (!name || !description || !price || stock === '' || stock < 0) { // Validate stock
@@ -867,7 +879,7 @@
                         name,
                         description,
                         price: parseFloat(price),
-                        imageUrl,
+                        imageUrl, // Pass the current imageUrl (could be URL or Base64)
                         stock: parseInt(stock), // Pass stock
                     });
                 };
@@ -921,8 +933,21 @@
                                     required
                                 />
                             </div>
+                            {/* New file input for image upload */}
                             <div>
-                                <label htmlFor="imageUrl" className="block text-gray-700 font-semibold mb-1">URL de la Imagen (opcional)</label>
+                                <label htmlFor="imageUpload" className="block text-gray-700 font-semibold mb-1">Subir Imagen</label>
+                                <input
+                                    type="file"
+                                    id="imageUpload"
+                                    accept="image/*"
+                                    onChange={handleImageUpload}
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                />
+                                <p className="text-sm text-gray-500 mt-1">Opcional: puedes subir una imagen desde tu PC.</p>
+                            </div>
+                            {/* Existing URL input for images (can be used as fallback or alternative) */}
+                            <div>
+                                <label htmlFor="imageUrl" className="block text-gray-700 font-semibold mb-1">URL de la Imagen (o se usará la subida)</label>
                                 <input
                                     type="text"
                                     id="imageUrl"
